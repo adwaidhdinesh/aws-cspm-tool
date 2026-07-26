@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Database
+*.db
+
+# AWS
+.aws/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Streamlit cache
+.streamlit/
+
+# Environment
+.env
+
+# Logs
+*.log
