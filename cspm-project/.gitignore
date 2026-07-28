@@ -1,7 +1,16 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Virtual environments
 .venv/
 venv/
-cspm.db
-latest_findings.json
+
+# Environment variables
 .env
+
+# Database
+*.db
+
+# Generated files
+latest_findings.json
