@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+cspm.db
+latest_findings.json
+.env
