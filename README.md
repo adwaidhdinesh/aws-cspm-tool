@@ -1,148 +1,190 @@
-# CSPM Tool — AWS Cloud Security Posture Management
+<div align="center">
 
-A lightweight Cloud Security Posture Management (CSPM) tool that scans an AWS
-account for misconfigurations mapped to CIS AWS Foundations Benchmark
-controls, scores the account's overall security posture, and displays
-findings in an interactive Streamlit dashboard.
+# ☁️ AWS CSPM Tool
 
-## Features
+**Cloud Security Posture Management for AWS**
 
-- Scans IAM, S3, EC2 Security Groups, CloudTrail, RDS, KMS, VPC, and
-  Lambda for common misconfigurations (14 checks total)
-- Each check is mapped to a CIS AWS Benchmark control ID
-- Findings are scored by severity (Critical / High / Medium / Low)
-- Overall posture score (0-100) per scan
-- Every finding is also mapped to equivalent controls in NIST 800-53,
-  PCI DSS v4.0, and ISO/IEC 27001:2022, with a per-framework compliance
-  view and exportable reports
-- Drift detection compares each scan to the previous one for the same
-  account and flags newly-failing checks, resolved checks, and new or
-  removed resources
-- Scan history stored in SQLite so you can track posture over time
-- Interactive dashboard to filter, explore, and export findings
+A lightweight CSPM tool that discovers AWS resources, checks them against the **CIS AWS Foundations Benchmark**, maps findings to compliance frameworks (NIST / PCI / ISO), scores your security posture, and tracks changes over time — with an interactive dashboard.
 
-## Project Structure
+`Python` · `boto3` · `Streamlit` · `SQLite` · `pytest`
 
-```
-cspm-project/
-├── main.py                 # CLI entry point — runs a scan
-├── dashboard.py             # Streamlit dashboard
-├── requirements.txt
-└── src/
-    ├── aws_client.py         # boto3 session/client helpers
-    ├── scanner.py             # Orchestrates rule checks
-    ├── scoring.py             # Posture score calculation
-    ├── compliance.py          # CIS -> NIST/PCI/ISO control mapping
-    ├── drift.py                # Compares findings between scans
-    ├── db.py                  # SQLite storage for scan history
-    └── rules/
-        ├── iam_rules.py
-        ├── s3_rules.py
-        ├── ec2_rules.py
-        ├── cloudtrail_rules.py
-        ├── rds_rules.py
-        ├── kms_rules.py
-        ├── vpc_rules.py
-        └── lambda_rules.py
-```
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![AWS](https://img.shields.io/badge/AWS-boto3-orange.svg)](https://aws.amazon.com/)
+[![CI](https://img.shields.io/badge/CI-pytest-lightgrey)]()
+[![Streamlit](https://img.shields.io/badge/Dashboard-Streamlit-red.svg)](https://streamlit.io/)
 
-## Setup
+</div>
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+---
 
-2. Configure AWS credentials (any of the standard boto3 methods work):
-   ```bash
-   aws configure
-   # or export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
-   ```
+## 📌 Overview
 
-   The IAM identity you use needs **read-only** permissions. The
-   `SecurityAudit` AWS managed policy covers everything this tool needs.
+AWS CSPM Tool continuously evaluates an AWS account for security misconfigurations. It:
 
-3. Run a scan from the CLI:
-   ```bash
-   python main.py
-   ```
-   This prints a summary, saves findings to `cspm.db`, and writes
-   `latest_findings.json`.
+- **Discovers** resources across IAM, S3, EC2, CloudTrail, RDS, KMS, VPC, and Lambda
+- **Checks** them against 14+ security rules mapped to **CIS AWS Foundations Benchmark**
+- **Scores** your overall security posture (0–100, letter-grade A–F)
+- **Maps** every finding to NIST 800-53, PCI DSS v4.0, and ISO/IEC 27001:2022
+- **Tracks** drift between scans (new failures, resolved issues, new/removed resources)
+- **Visualizes** everything in an interactive Streamlit dashboard
 
-4. Launch the dashboard:
-   ```bash
-   streamlit run dashboard.py
-   ```
+> **Designed for security engineers, auditors, and students** who want to understand cloud security posture — not just run a black-box scanner.
 
-## Adding New Rules
+---
 
-Each rule lives in `src/rules/<service>_rules.py` and is a function that:
+## 🏗️ Architecture
 
-1. Takes a boto3 `session` as input
-2. Returns a list of finding dicts with this shape:
+```mermaid
+flowchart TB
+    subgraph CLI[CLI Layer]
+        A[main.py] --> B[Scanner Orchestrator<br/>src/scanner.py]
+    end
 
-```python
-{
-    "rule_id": "S3-001",
-    "cis_control": "2.1.5",
-    "title": "S3 bucket allows public read access",
-    "severity": "Critical",   # Critical | High | Medium | Low
-    "resource": "my-bucket-name",
-    "status": "FAIL",          # FAIL | PASS
-    "description": "...",
-    "remediation": "..."
-}
+    B --> C[AWS Client<br/>src/aws_client.py]
+    C -->|boto3 session| D[AWS Account<br/>IAM / S3 / EC2 / CloudTrail / RDS / KMS / VPC / Lambda]
+
+    B --> E[Rules Engine<br/>src/rules/*]
+    E --> F[Findings]
+
+    F --> G[Scoring Engine<br/>src/scoring.py]
+    F --> H[Compliance Mapper<br/>src/compliance.py]
+    F --> I[Drift Detector<br/>src/drift.py]
+
+    G --> J[(SQLite<br/>cspm.db)]
+    H --> J
+    I --> J
+
+    J --> K[Streamlit Dashboard<br/>dashboard.py]
+    K --> L[Findings Tab]
+    K --> M[Compliance Tab]
+    K --> N[Drift Tab]
 ```
 
-Register the function in `src/scanner.py`'s `ALL_RULES` list and it will
-automatically be included in every scan and scored.
+**Data flow:** CLI triggers a scan → boto3 session discovers resources → rules engine evaluates each resource → findings are scored, mapped to compliance frameworks, and stored in SQLite → the dashboard visualizes results and compares scans over time.
 
-If your new rule's `cis_control` isn't already in
-`src/compliance.py`'s `CIS_TO_FRAMEWORKS` dict, add an entry there too —
-otherwise it just won't show up under NIST/PCI/ISO in the Compliance tab
-(it will still appear normally under Findings and in the posture score).
+---
 
-## Compliance Framework Mapping
+## ✨ Features
 
-Every finding carries a `cis_control` field (e.g. `1.5`, `2.1.5`). The
-`src/compliance.py` module maps each of these to equivalent controls in:
+| Feature | Description |
+|---------|-------------|
+| 🔍 **Resource Discovery** | Scans 8 AWS services (IAM, S3, EC2, CloudTrail, RDS, KMS, VPC, Lambda) |
+| 🛡️ **14+ Security Checks** | Mapped to CIS AWS Foundations Benchmark controls |
+| 🎯 **Posture Scoring** | 0–100 score with A–F letter grades, severity-weighted |
+| 🏛️ **Multi-Framework** | NIST 800-53 Rev. 5, PCI DSS v4.0, ISO/IEC 27001:2022 mapping |
+| 📈 **Drift Detection** | Tracks NEW_FAIL, RESOLVED, NEW_RESOURCE, REMOVED_RESOURCE between scans |
+| 🗄️ **SQLite Persistence** | Full scan history for posture trending over time |
+| 📊 **Streamlit Dashboard** | Interactive filtering, exportable reports, compliance view |
+| 🧪 **Testable** | Designed to run without real AWS credentials (mocked boto3) |
 
-- **NIST 800-53 Rev. 5**
-- **PCI DSS v4.0**
-- **ISO/IEC 27001:2022**
+---
 
-These mappings are stored per-finding when a scan is saved (`db.py`
-adds `nist_controls`, `pci_controls`, `iso_controls` columns), and the
-dashboard's **Compliance** tab rolls findings up per framework into a
-per-control pass/fail table plus a rough "% of controls clean" score,
-with CSV export per framework.
+## 🔒 Security Checks
 
-**Important:** these mappings are simplified for illustrative /
-educational purposes — they are not an official crosswalk and shouldn't
-be used as the sole basis for a real compliance audit. For that, use
-your framework's published control mapping documentation or a
-certified GRC tool.
+| Rule ID | AWS Service | Control | Check |
+|---------|-------------|---------|-------|
+| IAM-001 | IAM | CIS 1.5 | MFA enabled on root account |
+| IAM-002 | IAM | CIS 1.16 | IAM policies attached to users (vs groups/roles) |
+| S3-001 | S3 | CIS 2.1.5 | S3 bucket allows public read access |
+| S3-002 | S3 | CIS 2.1.2 | S3 bucket allows public write access |
+| EC2-001 | EC2 | CIS 4.1 | Security groups with unrestricted inbound SSH (22) |
+| EC2-002 | EC2 | CIS 4.1 | Security groups with unrestricted inbound RDP (3389) |
+| CT-001 | CloudTrail | CIS 3.1 | CloudTrail enabled in the region |
+| CT-002 | CloudTrail | CIS 3.2 | CloudTrail log file validation enabled |
+| CT-003 | CloudTrail | CIS 3.3 | CloudTrail integrated with CloudWatch Logs |
+| RDS-001 | RDS | CIS 2.1.1 | RDS instance publicly accessible |
+| RDS-002 | RDS | CIS 2.1.1 | RDS instance encryption at rest disabled |
+| KMS-001 | KMS | CIS 2.1.1 | KMS key rotation not enabled |
+| VPC-001 | VPC | CIS 4.4 | Default VPC security groups unrestricted (0.0.0.0/0) |
+| LMB-001 | Lambda | — | Lambda function with overly permissive IAM role |
+| LMB-002 | Lambda | — | Lambda function with public event source mapping |
 
-## Drift Detection
+*Each finding includes a remediation recommendation.*
 
-Each finding is uniquely identified by `(rule_id, resource)`. When you
-view a scan in the dashboard's **Drift** tab, `src/drift.py` compares
-its findings against the immediately preceding scan for the same
-account and classifies every change:
+---
 
-- **NEW_FAIL** — a check that used to pass now fails (regression)
-- **RESOLVED** — a check that used to fail now passes
-- **NEW_RESOURCE** — a resource that wasn't seen in the previous scan
-- **REMOVED_RESOURCE** — a resource from the previous scan no longer exists
+## 🚀 Quick Start
 
-This only requires running `python main.py` more than once against the
-same account — no extra setup needed. It's useful for catching
-accidental or unauthorized configuration changes between scans.
+### Prerequisites
+- Python 3.10+
+- AWS account (or local emulator like [FLoC](https://github.com/localstack/localstack) for testing)
+- IAM identity with **read-only** permissions (`SecurityAudit` managed policy covers everything)
 
-## Suggested Next Steps (for extending the project)
+### Installation
 
-- Add more rule modules: RDS, KMS, Lambda, VPC flow logs
-- Add a PDF/HTML compliance report generator (good for a "deliverable" demo)
-- Add scheduled scanning (cron / Lambda) for continuous monitoring
-- Add Slack/email alerting on new Critical findings
-- Support scanning multiple AWS accounts/roles (cross-account IAM role assumption)
+```bash
+# 1. Clone & install
+git clone https://github.com/adwaidhdinesh/aws-cspm-tool.git
+cd aws-cspm-tool
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Configure AWS credentials (any standard boto3 method)
+aws configure
+# or: export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+```
+
+### Run a Scan
+
+```bash
+python main.py
+```
+
+Prints a summary, saves findings to `cspm.db`, and writes `latest_findings.json`.
+
+### Launch the Dashboard
+
+```bash
+streamlit run dashboard.py
+```
+
+---
+
+## 🧪 Testing
+
+The project is designed to be testable **without real AWS credentials** — boto3 calls are mocked so you can run the full test suite locally with no AWS access.
+
+```bash
+pip install pytest pytest-mock
+pytest
+```
+
+**Test coverage includes:**
+- ✅ Rule modules (each service's checks)
+- ✅ Scoring engine (severity weights, grade calculation)
+- ✅ Compliance mapping (CIS → NIST/PCI/ISO crosswalk)
+- ✅ Drift detection (change classification)
+- ✅ Database layer (SQLite persistence)
+- ✅ CLI flow (end-to-end)
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] PDF/HTML compliance report generator
+- [ ] Scheduled scanning (cron / Lambda) for continuous monitoring
+- [ ] Slack / email alerting on new Critical findings
+- [ ] Multi-account support (cross-account role assumption)
+- [ ] AI-assisted security analysis of findings
+- [ ] More checks: VPC flow logs, GuardDuty, AWS Config
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE).
+
+---
+
+## 🙌 Contributing
+
+Found a bug? Want a new security check? Open an issue or PR.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+<div align="center">
+  <sub>Built for learning and real-world use — feedback and PRs welcome!</sub>
+</div>
