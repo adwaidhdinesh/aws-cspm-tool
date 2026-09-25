@@ -1,5 +1,11 @@
 # CSPM Tool — AWS Cloud Security Posture Management
 
+[![CI](https://github.com/adwaidhdinesh/aws-cspm-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/adwaidhdinesh/aws-cspm-tool/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)](frontend/)
+[![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688.svg)](api/)
+
 An intelligent AWS Cloud Security Posture Management tool that discovers
 your AWS resources into an asset inventory, runs 15 security checks
 mapped to the CIS AWS Foundations Benchmark, scores your account's

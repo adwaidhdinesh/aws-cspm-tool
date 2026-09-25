@@ -12,10 +12,12 @@ Thank you for considering contributing! This project aims to be a practical, rec
 
 ## Adding a New Security Check
 
-1. Create/edit a rule module in `src/rules/<service>_rules.py`
-2. Each rule is a function that:
-   - Takes a boto3 `session` as input
-   - Returns a list of finding dicts:
+1. Create or edit a rule module in `src/rules/<service>_rules.py`
+2. Each rule is a pure function that:
+   - Takes a list of normalized `Asset` objects as input: `assets: list[Asset]`
+   - Filters by `resource_type` (e.g. `asset.resource_type == "s3_bucket"`)
+   - Evaluates `asset.metadata` without making any external AWS API calls
+   - Returns a list of standard finding dicts created with `make_finding()`:
 
 ```python
 {
@@ -32,7 +34,7 @@ Thank you for considering contributing! This project aims to be a practical, rec
 
 3. Register the function in `src/scanner.py`'s `ALL_RULES` list
 4. If the rule maps to a new CIS control, add it to `src/compliance.py`'s `CIS_TO_FRAMEWORKS`
-5. **Add tests** — every rule should have a mocked-boto3 test in `tests/`
+5. **Add tests** — every rule should have unit tests in `tests/test_<service>_rules.py` using mock `Asset` objects (no AWS credentials required)
 
 ## Development Setup
 
