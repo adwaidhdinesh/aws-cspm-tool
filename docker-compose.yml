@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cspm
+      POSTGRES_USER: cspm
+      POSTGRES_PASSWORD: cspm
+    ports:
+      - "5432:5432"
+    volumes:
+      - cspm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cspm -d cspm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cspm_postgres_data:

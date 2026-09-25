@@ -1,0 +1,124 @@
+name: CSPM CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint-and-unit:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: |
+          pytest -m "not integration and not aws" -v
+
+  floci-integration:
+    name: Floci Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # Docker is available on GitHub runners by default
+      docker:
+        image: docker:dind
+        options: --privileged
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Start Floci
+        run: |
+          docker compose -f docker-compose.floci.yml up -d
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Wait for Floci to be healthy
+        run: |
+          echo "Waiting for Floci to start..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:4566/_localstack/health > /dev/null; then
+              echo "Floci is healthy!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Floci did not become healthy in time"
+          docker compose -f docker-compose.floci.yml logs
+          exit 1
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Seed Floci with insecure profile
+        run: |
+          python scripts/seed_floci.py --profile insecure
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Run Floci integration tests
+        run: |
+          pytest -m integration -v
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Run CSPM scan against Floci (verification)
+        run: |
+          python main.py --endpoint-url http://localhost:4566
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Capture Floci logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.floci.yml logs > floci-logs.txt
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Upload Floci logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-logs
+          path: floci-logs.txt
+
+      - name: Cleanup Floci
+        if: always()
+        run: |
+          docker compose -f docker-compose.floci.yml down -v
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+  # Real AWS contract tests - only run on explicit trigger
+  # Not included in normal CI to avoid costs and credential requirements
