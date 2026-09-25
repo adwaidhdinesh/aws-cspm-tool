@@ -1,1 +1,0 @@
-bash: ./inspect-ai-stack.sh: No such file or directory
