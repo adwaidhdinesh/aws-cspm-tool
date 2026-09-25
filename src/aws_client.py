@@ -5,7 +5,7 @@ Centralizing this makes it trivial to later add support for:
 - Assuming a cross-account role
 - Using a named profile
 - Restricting to a specific region
-- Overriding the endpoint URL (for Floci/local testing)
+- Overriding the endpoint URL (for private or AWS-compatible endpoints)
 """
 
 from typing import Optional
@@ -26,7 +26,7 @@ def get_session(
     Args:
         profile: Optional named AWS CLI profile to use.
         region: Default region for regional API calls (IAM/S3 are global).
-        endpoint_url: Optional custom endpoint URL (e.g., for Floci/local testing).
+        endpoint_url: Optional custom AWS-compatible endpoint URL.
 
     Returns:
         A configured boto3.Session.

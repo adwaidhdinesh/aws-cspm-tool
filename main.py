@@ -6,7 +6,7 @@ JSON snapshot.
 Usage:
     python main.py
     python main.py --profile my-aws-profile --region us-west-2
-    python main.py --endpoint-url http://localhost:4566  # For Floci testing
+    python main.py --endpoint-url https://aws.example.internal  # Custom AWS-compatible endpoint
 """
 
 import argparse
@@ -40,7 +40,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run a CSPM scan against an AWS account.")
     parser.add_argument("--profile", default=None, help="Named AWS CLI profile to use")
     parser.add_argument("--region", default="us-east-1", help="AWS region for regional API calls")
-    parser.add_argument("--endpoint-url", default=None, help="Custom endpoint URL (e.g., http://localhost:4566 for Floci)")
+    parser.add_argument("--endpoint-url", default=None, help="Custom AWS-compatible endpoint URL")
     args = parser.parse_args()
 
     # CLI flag takes precedence over AWS_ENDPOINT_URL environment variable.

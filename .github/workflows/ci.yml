@@ -6,32 +6,22 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  PYTHON_VERSION: "3.11"
-
 jobs:
-  lint-and-unit:
-    name: Lint & Unit Tests
+  python-unit:
+    name: Python Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.11"
           cache: pip
-
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-
       - name: Run unit tests
-        run: |
-          pytest tests/test_*.py -v
-
+        run: pytest tests/test_*.py -v
       - name: Compile Python sources
         run: python -m compileall -q src api main.py
 
@@ -39,121 +29,11 @@ jobs:
     name: React Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
       - name: Build React dashboard
         run: npm --prefix frontend ci && npm --prefix frontend run build
-
-  floci-integration:
-    name: Floci Integration Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      # Docker is available on GitHub runners by default
-      docker:
-        image: docker:dind
-        options: --privileged
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: cspm
-          POSTGRES_USER: cspm
-          POSTGRES_PASSWORD: cspm
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U cspm -d cspm"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Start Floci
-        run: |
-          docker compose -f docker-compose.floci.yml up -d
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-
-      - name: Wait for Floci to be healthy
-        run: |
-          echo "Waiting for Floci to start..."
-          for i in {1..30}; do
-            if curl -sf http://localhost:4566/_localstack/health > /dev/null; then
-              echo "Floci is healthy!"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Floci did not become healthy in time"
-          docker compose -f docker-compose.floci.yml logs
-          exit 1
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-
-      - name: Seed Floci with insecure profile
-        run: |
-          python scripts/seed_floci.py --profile insecure
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-
-      - name: Run Floci integration tests
-        run: |
-          pytest tests/integration -m integration -v
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-          DATABASE_URL: postgresql://cspm:cspm@localhost:5432/cspm
-
-      - name: Run CSPM scan against Floci (verification)
-        run: |
-          python main.py --endpoint-url http://localhost:4566
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-          DATABASE_URL: postgresql://cspm:cspm@localhost:5432/cspm
-
-      - name: Capture Floci logs on failure
-        if: failure()
-        run: |
-          docker compose -f docker-compose.floci.yml logs > floci-logs.txt
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-
-      - name: Upload Floci logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: floci-logs
-          path: floci-logs.txt
-
-      - name: Cleanup Floci
-        if: always()
-        run: |
-          docker compose -f docker-compose.floci.yml down -v
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-
-  # Real AWS contract tests - only run on explicit trigger
-  # Not included in normal CI to avoid costs and credential requirements

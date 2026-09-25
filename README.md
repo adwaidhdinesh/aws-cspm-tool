@@ -64,31 +64,19 @@ cspm-project/
 ├── AGENTS.md                   # Agent workflow and feature-map maintenance rule
 ├── FEATURE_MAP.md              # Source-verified feature/module routing index
 ├── main.py                     # CLI entry point — runs a scan
-├── dashboard.py                # Legacy Streamlit dashboard (not the supported UI)
 ├── api/main.py                 # FastAPI dashboard API
 ├── frontend/                   # Vite + React dashboard
 ├── docker-compose.yml          # Local PostgreSQL environment
-├── docker-compose.floci.yml    # Floci local AWS emulator environment
 ├── pytest.ini                  # Pytest marker configuration
 ├── requirements.txt            # Runtime dependencies
 ├── requirements-dev.txt        # Development-only dependencies (pytest)
 ├── latest_findings.json        # JSON snapshot of last scan
 ├── tests/
-│   ├── unit/ (existing)        # Unit tests (no Docker, AWS, or Floci)
-│   ├── integration/            # Floci integration tests
-│   │   ├── conftest.py         # Shared fixtures for integration tests
-│   │   ├── test_s3_discovery_floci.py
-│   │   ├── test_iam_discovery_floci.py
-│   │   ├── test_ec2_discovery_floci.py
-│   │   ├── test_other_services_floci.py
-│   │   └── test_end_to_end_floci.py
+│   ├── test_*.py               # Unit tests (no Docker or AWS required)
 │   └── contract/               # Real AWS contract tests (opt-in only)
 │       └── test_real_aws.py
 ├── scripts/
-│   ├── seed_floci.py           # Create deterministic test resources in Floci
-│   └── reset_floci.py          # Reset Floci environment
-├── docs/
-│   └── FLOCI_COMPATIBILITY.md  # AWS API operation compatibility matrix
+│   └── migrate_sqlite_to_postgres.py  # One-time history migration
 └── src/
     ├── __init__.py
     ├── aws_client.py            # boto3 session/client helpers
@@ -155,10 +143,6 @@ Runtime dependencies: `boto3`, `psycopg`, `fastapi`, `uvicorn`, `requests`.
 
 The React dashboard additionally requires Node.js 20 or later.
 
-`dashboard.py` is retained as a legacy Streamlit reference. The supported
-dashboard is the React application in `frontend/`; Streamlit and pandas are
-not installed by the current runtime requirements or CI workflow.
-
 ### 3. Start PostgreSQL
 
 ```bash
@@ -218,14 +202,8 @@ npm run dev
 ### 7. Run tests
 
 ```bash
-# Unit tests only (no Docker, AWS, or Floci needed)
-pytest -m "not integration and not aws"
-
-# Floci integration tests (requires Floci running)
-pytest -m integration
-
-# All tests
-pytest
+# Unit tests (no Docker or AWS needed)
+pytest tests/test_*.py
 
 # Optional real AWS contract tests (requires AWS credentials + CSPM_RUN_AWS_TESTS=1)
 pytest -m aws
@@ -428,153 +406,21 @@ change:
 Only requires running `python main.py` more than once against the same
 account — no extra setup needed.
 
-## Local AWS Integration Testing with Floci
+## Testing strategy
 
-[CSPM v3.1] Floci is a free, local, AWS-compatible emulator that lets you
-test the CSPM scanner against AWS-compatible APIs without any real AWS
-credentials, costs, or risk.
-
-### What is Floci?
-
-Floci is an AWS wire-protocol-compatible HTTP emulator that runs on your
-machine and exposes APIs that look and behave like AWS at
-`http://localhost:4566`. The CSPM uses the exact same boto3 calls against
-Floci that it uses against real AWS. The only difference is that Floci
-runs locally and never touches real AWS infrastructure.
-
-### Why does CSPM use Floci?
-
-- **Test without AWS credentials** — no need for real AWS keys
-- **Deterministic test data** — seed known vulnerable/secure resources
-- **No cost** — full integration tests without AWS charges
-- **Faster iterations** — spin up/down resources locally
-- **CI-friendly** — integration tests run in GitHub Actions
-
-### How endpoint overriding works
-
-The CSPM reads an optional endpoint URL to decide where boto3 should talk:
-
-- **Without override** — boto3 uses AWS's standard endpoints (real AWS)
-- **With override** — boto3 talks to the local endpoint (Floci)
-
-Request and response formatting is identical; only the destination host
-changes. The `--endpoint-url` CLI flag and `AWS_ENDPOINT_URL` environment
-variable both control this (CLI takes precedence).
-
-> [!NOTE]
-> Do not set `AWS_ENDPOINT_URL` globally — if you do, every AWS SDK on the
-> machine (including tools like the AWS CLI) will try to talk to Floci.
-
-### Start Floci
+Unit tests cover discovery-independent rules, scoring, compliance, drift,
+AI context construction, and answer validation using deterministic fixtures.
+They run without Docker or AWS credentials:
 
 ```bash
-docker compose -f docker-compose.floci.yml up -d
+pytest tests/test_*.py
 ```
 
-This starts Floci on port 4566.
-
-### Seed it
+The opt-in real-AWS contract suite validates selected discovery behavior
+against an authenticated account:
 
 ```bash
-# Intentionally vulnerable environment (default for integration tests)
-python scripts/seed_floci.py --profile insecure
-
-# Secure environment
-python scripts/seed_floci.py --profile secure
-
-# Mixed (both secure and insecure)
-python scripts/seed_floci.py --profile mixed
-```
-
-Seeding is idempotent — running the same profile twice won't create
-duplicate resources.
-
-### Scan it
-
-```bash
-python main.py --endpoint-url http://localhost:4566
-```
-
-Or set the environment variable instead:
-
-```bash
-AWS_ENDPOINT_URL=http://localhost:4566 python main.py
-```
-
-Both are equivalent.
-
-### Reset it
-
-```bash
-# Cleanest approach — restart Docker container
-python scripts/reset_floci.py
-
-# Or clean resources via API calls only (keeps container running)
-python scripts/reset_floci.py --method api
-```
-
-### Which services are supported?
-
-The seed script and CSPM integration tests cover:
-
-| Service | Status |
-|---------|--------|
-| S3 | Supported |
-| IAM | Supported |
-| EC2 | Supported |
-| CloudTrail | Partially supported |
-| RDS | Partially supported |
-| KMS | Supported |
-| VPC | Supported |
-| Lambda | Partially supported |
-
-See `docs/FLOCI_COMPATIBILITY.md` for the detailed per-operation matrix.
-
-### Known limitations
-
-- **Emulator ≠ AWS** — Floci approximates AWS behavior but does not
-  replicate every detail (policy evaluation, automatically-derived
-  statuses, some service defaults).
-- **`get_bucket_policy_status`** — returns whether a bucket has a policy,
-  not necessarily whether that policy is truly "public" in AWS's semantics.
-- **Persistence** — Floci state is in-memory by default. Restarting the
-  container wipes resources; re-run the seed script.
-- **Some heavy services** — Lambda, RDS, CloudTrail may show partial
-  behavior depending on how Floci implements them. The compatibility
-  matrix lists the exact API operations and their status.
-
-### Why do unit tests still exist?
-
-Unit tests run pure logic (rules, scoring, drift, compliance mapping)
-directly on in-memory Asset objects. They are fast, deterministic, and do
-not require Docker, AWS, or Floci. They test "given this asset config,
-does the rule produce the right finding?" — regardless of how the AWS API
-returned that config.
-
-### Why a small real-AWS contract suite may still be necessary
-
-Floci is a wire-compatible emulator, not AWS. Some behavior — especially
-derived values like public-access evaluation or policy effects — can only
-be validated against real AWS. The contract tests (`pytest -m aws`) are
-for exactly that. They are opt-in and never run by default.
-
-### Three-tier testing model
-
-```
-Tier 1: Unit Tests
-    In-memory Asset objects → pure rule functions → findings
-    Fast, deterministic, no dependencies.
-    Command: pytest -m "not integration and not aws"
-
-Tier 2: Floci Integration Tests
-    boto3 → Floci → discoverers → inventory → rules → findings
-    Test the full pipeline locally.
-    Command: pytest -m integration
-
-Tier 3: Real AWS Contract Validation
-    boto3 → real AWS → discoverers → inventory → rules → findings
-    Validates emulator fidelity. Opt-in only.
-    Command: pytest -m aws
+CSPM_RUN_AWS_TESTS=1 pytest -m aws
 ```
 
 ## Adding a New Service

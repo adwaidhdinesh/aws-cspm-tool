@@ -8,7 +8,7 @@ Thank you for considering contributing! This project aims to be a practical, rec
 - ✨ **New security checks** — add a rule module following the pattern below
 - 📝 **Documentation** — improve README, add examples, fix typos
 - 🧪 **Tests** — increase coverage, especially for rules and scoring
-- 🎨 **Dashboard** — improve the Streamlit UI / visualizations
+- 🎨 **Dashboard** — improve the React UI / visualizations
 
 ## Adding a New Security Check
 

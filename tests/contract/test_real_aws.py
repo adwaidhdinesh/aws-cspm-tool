@@ -1,7 +1,7 @@
 """Contract tests for real AWS (Tier 3).
 
 These tests run against actual AWS and require explicit opt-in.
-They validate that Floci behavior matches real AWS for critical operations.
+They validate critical discovery behavior against real AWS.
 
 Usage:
     pytest -m aws

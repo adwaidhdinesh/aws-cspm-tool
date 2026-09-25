@@ -122,7 +122,7 @@ def discover_s3_assets(session, account_id: str) -> list:
             if s3.get_bucket_policy_status(Bucket=name)["PolicyStatus"]["IsPublic"]:
                 is_public = True
         except (ClientError, KeyError, TypeError):
-            # Floci may return empty PolicyStatus; skip rather than crash
+            # Some AWS-compatible endpoints may return empty PolicyStatus; skip rather than crash.
             pass
 
         try:
