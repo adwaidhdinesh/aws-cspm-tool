@@ -52,6 +52,7 @@ All checks are triggered together by `src/scanner.py:run_scan()` during `python 
 | --- | --- | --- | --- |
 | Dashboard API | `api/main.py`; FastAPI routes: `/health`, `/api/scans`, scan/findings/assets routes, compliance, drift, and copilot routes | `uvicorn api.main:app --reload`; React calls it over HTTP | No dedicated API endpoint test currently | `DATABASE_URL`; `CORS_ORIGINS`; FastAPI, Uvicorn |
 | React application shell and scan selector | `frontend/src/main.jsx`; `frontend/src/App.jsx:App()` initial scan-loading effects; `frontend/src/api.js:api()` | `cd frontend && npm run dev` | Production build: `npm --prefix frontend run build`; no frontend test suite currently | React, Vite; `VITE_API_URL` or Vite's API proxy |
+| Legacy Streamlit dashboard (inactive) | `dashboard.py` | Manual `streamlit run dashboard.py` only after separately installing its historical Streamlit/pandas dependencies | No dedicated test currently | Retained for reference; it is not installed, documented as supported, or exercised by the current CI |
 | Overview at a glance | `frontend/src/App.jsx` `tab === "Overview"`; `Trend()` and `openPriorityFinding()` | React **Overview** tab, default view | No frontend test currently | Scans, findings, and assets API data |
 | Asset inventory and details | `frontend/src/App.jsx` `tab === "Assets"` | React **Assets** tab | No frontend test currently | `GET /api/scans/{scan_id}/assets`; asset tags and metadata from PostgreSQL |
 | Findings review and CSV export | `frontend/src/App.jsx` `tab === "Findings"`; `FindingRow()` and `csvDownload()` | React **Findings** tab and filter/download controls | No frontend test currently | `GET /api/scans/{scan_id}/findings`; browser Blob download API |
@@ -74,12 +75,13 @@ All checks are triggered together by `src/scanner.py:run_scan()` during `python 
 | --- | --- | --- | --- |
 | Local AWS emulator fixtures | `docker-compose.floci.yml`; `scripts/seed_floci.py:main()`; `scripts/reset_floci.py:main()` | Start Floci with Docker Compose, then seed/reset scripts | `tests/integration/` | Floci endpoint (normally `http://localhost:4566`), test AWS credentials, Docker |
 | Unit suite | `tests/test_*.py` | `pytest tests/test_*.py` | 164 tests at the time this map was written | pytest and pure-Python/mocked dependencies |
+| GitHub Actions CI | `.github/workflows/ci.yml` runs Python unit/compile checks, the React production build, and the Floci integration flow | Pushes and pull requests targeting `main` | Executes the suites and build listed in adjacent rows | GitHub Actions; Python 3.11, Node 20, Floci Docker service, and PostgreSQL service |
 | Floci integration suite | `tests/integration/conftest.py` and test modules | `pytest -m integration` with Floci running and PostgreSQL configured for persistence coverage | Discovery and scan pipeline integration tests | Docker/Floci, boto3 test credentials, `DATABASE_URL` for persistence test |
 | Real AWS contract suite | `tests/contract/test_real_aws.py` | `CSPM_RUN_AWS_TESTS=1 pytest -m aws` | Opt-in live AWS discovery contracts | Real AWS credentials and explicit opt-in variable |
 
 ## Current architecture note
 
-The active application uses **PostgreSQL**, **FastAPI**, and a **React/Vite** dashboard. SQLite and Streamlit are not active runtime components; SQLite is retained only as an optional import source in `scripts/migrate_sqlite_to_postgres.py`.
+The active application uses **PostgreSQL**, **FastAPI**, and a **React/Vite** dashboard. SQLite is retained only as an optional import source in `scripts/migrate_sqlite_to_postgres.py`. `dashboard.py` is retained as an inactive Streamlit reference, but Streamlit is not part of the supported runtime requirements or CI path.
 
 ## Maintenance rule
 

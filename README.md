@@ -64,6 +64,7 @@ cspm-project/
 ├── AGENTS.md                   # Agent workflow and feature-map maintenance rule
 ├── FEATURE_MAP.md              # Source-verified feature/module routing index
 ├── main.py                     # CLI entry point — runs a scan
+├── dashboard.py                # Legacy Streamlit dashboard (not the supported UI)
 ├── api/main.py                 # FastAPI dashboard API
 ├── frontend/                   # Vite + React dashboard
 ├── docker-compose.yml          # Local PostgreSQL environment
@@ -153,6 +154,10 @@ pip install -r requirements-dev.txt
 Runtime dependencies: `boto3`, `psycopg`, `fastapi`, `uvicorn`, `requests`.
 
 The React dashboard additionally requires Node.js 20 or later.
+
+`dashboard.py` is retained as a legacy Streamlit reference. The supported
+dashboard is the React application in `frontend/`; Streamlit and pandas are
+not installed by the current runtime requirements or CI workflow.
 
 ### 3. Start PostgreSQL
 

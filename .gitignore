@@ -1,10 +1,13 @@
 __pycache__/
 *.py[cod]
+*.pyo
+*.egg-info/
 .venv/
 venv/
 .env
 .env.*
 !.env.example
+.aws/
 *.db
 latest_findings.json
 ai-stack-state.txt
